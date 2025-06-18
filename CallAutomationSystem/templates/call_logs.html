@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Call Logs - Call Automation System</title>
+    <link href="https://cdn.replit.com/agent/bootstrap-agent-dark-theme.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <link href="{{ url_for('static', filename='css/dashboard.css') }}" rel="stylesheet">
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+        <div class="container">
+            <a class="navbar-brand" href="{{ url_for('dashboard') }}">
+                <i class="fas fa-phone-alt me-2"></i>
+                Call Automation System
+            </a>
+            <div class="navbar-nav ms-auto">
+                <a class="nav-link" href="{{ url_for('dashboard') }}">
+                    <i class="fas fa-tachometer-alt me-1"></i>
+                    Dashboard
+                </a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container mt-4">
+        <div class="row mb-4">
+            <div class="col-12">
+                <h2>
+                    <i class="fas fa-list me-2"></i>
+                    Call Logs
+                </h2>
+            </div>
+        </div>
+
+        <!-- Filters -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="card-title mb-0">
+                            <i class="fas fa-filter me-2"></i>
+                            Filters
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-3">
+                                <label for="status-filter" class="form-label">Status:</label>
+                                <select id="status-filter" class="form-select">
+                                    <option value="">All Statuses</option>
+                                    <option value="connected">Connected</option>
+                                    <option value="accepted">Accepted</option>
+                                    <option value="forwarded">Forwarded</option>
+                                    <option value="failed">Failed</option>
+                                    <option value="disconnected">Disconnected</option>
+                                </select>
+                            </div>
+                            <div class="col-md-3">
+                                <label for="phone-filter" class="form-label">Phone Number:</label>
+                                <input type="text" id="phone-filter" class="form-control" placeholder="Search phone number">
+                            </div>
+                            <div class="col-md-3">
+                                <label for="date-from" class="form-label">From Date:</label>
+                                <input type="date" id="date-from" class="form-control">
+                            </div>
+                            <div class="col-md-3">
+                                <label for="date-to" class="form-label">To Date:</label>
+                                <input type="date" id="date-to" class="form-control">
+                            </div>
+                        </div>
+                        <div class="row mt-3">
+                            <div class="col-12">
+                                <button id="apply-filters" class="btn btn-primary">
+                                    <i class="fas fa-search me-1"></i>
+                                    Apply Filters
+                                </button>
+                                <button id="clear-filters" class="btn btn-secondary ms-2">
+                                    <i class="fas fa-times me-1"></i>
+                                    Clear Filters
+                                </button>
+                                <button id="export-logs" class="btn btn-success ms-2">
+                                    <i class="fas fa-download me-1"></i>
+                                    Export CSV
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Call Logs Table -->
+        <div class="row">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5 class="card-title mb-0">
+                            <i class="fas fa-phone-alt me-2"></i>
+                            Call History
+                        </h5>
+                        <div>
+                            <span class="text-muted">Page {{ page }}</span>
+                            <button id="refresh-table" class="btn btn-sm btn-outline-primary ms-2">
+                                <i class="fas fa-sync-alt"></i>
+                                Refresh
+                            </button>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-striped">
+                                <thead>
+                                    <tr>
+                                        <th>ID</th>
+                                        <th>Phone Number</th>
+                                        <th>Caller Name</th>
+                                        <th>Status</th>
+                                        <th>Response</th>
+                                        <th>Start Time</th>
+                                        <th>End Time</th>
+                                        <th>Duration</th>
+                                        <th>Call SID</th>
+                                        <th>Notes</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="call-logs-table">
+                                    {% for call in calls %}
+                                    <tr data-call-id="{{ call.id }}">
+                                        <td>{{ call.id }}</td>
+                                        <td>{{ call.phone_number }}</td>
+                                        <td>{{ call.caller_name or '-' }}</td>
+                                        <td>
+                                            <span class="badge call-status-{{ call.call_status|lower }}">
+                                                {{ call.call_status }}
+                                            </span>
+                                        </td>
+                                        <td>
+                                            {% if call.response %}
+                                                <span class="badge bg-{{ 'success' if call.response == 'Accepted' else 'warning' }}">
+                                                    {{ call.response }}
+                                                </span>
+                                            {% else %}
+                                                -
+                                            {% endif %}
+                                        </td>
+                                        <td>{{ call.start_time or '-' }}</td>
+                                        <td>{{ call.end_time or '-' }}</td>
+                                        <td>
+                                            {% if call.duration %}
+                                                {{ call.duration }}s
+                                            {% else %}
+                                                -
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            {% if call.call_sid %}
+                                                <small class="text-muted">{{ call.call_sid[:8] }}...</small>
+                                            {% else %}
+                                                -
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            {% if call.notes %}
+                                                <i class="fas fa-sticky-note" title="{{ call.notes }}"></i>
+                                            {% else %}
+                                                -
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            <div class="btn-group btn-group-sm">
+                                                <button class="btn btn-outline-primary view-details" 
+                                                        data-call-id="{{ call.id }}" 
+                                                        title="View Details">
+                                                    <i class="fas fa-eye"></i>
+                                                </button>
+                                                {% if call.call_status == 'Connected' %}
+                                                <button class="btn btn-outline-success call-response" 
+                                                        data-call-sid="{{ call.call_sid }}" 
+                                                        data-response="1" 
+                                                        title="Mark as Accepted">
+                                                    <i class="fas fa-check"></i>
+                                                </button>
+                                                <button class="btn btn-outline-warning call-response" 
+                                                        data-call-sid="{{ call.call_sid }}" 
+                                                        data-response="2" 
+                                                        title="Mark as Forwarded">
+                                                    <i class="fas fa-share"></i>
+                                                </button>
+                                                {% endif %}
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    {% else %}
+                                    <tr>
+                                        <td colspan="11" class="text-center text-muted">No call logs found</td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <!-- Pagination -->
+                        {% if calls %}
+                        <nav aria-label="Call logs pagination">
+                            <ul class="pagination justify-content-center">
+                                {% if page > 1 %}
+                                <li class="page-item">
+                                    <a class="page-link" href="{{ url_for('call_logs', page=page-1) }}">Previous</a>
+                                </li>
+                                {% endif %}
+                                
+                                <li class="page-item active">
+                                    <span class="page-link">{{ page }}</span>
+                                </li>
+                                
+                                {% if calls|length == 50 %}
+                                <li class="page-item">
+                                    <a class="page-link" href="{{ url_for('call_logs', page=page+1) }}">Next</a>
+                                </li>
+                                {% endif %}
+                            </ul>
+                        </nav>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Call Details Modal -->
+    <div class="modal fade" id="callDetailsModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Call Details</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body" id="callDetailsContent">
+                    <!-- Call details will be loaded here -->
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
+    
+    <script>
+        // Call logs specific functionality
+        document.addEventListener('DOMContentLoaded', function() {
+            // View details functionality
+            document.querySelectorAll('.view-details').forEach(button => {
+                button.addEventListener('click', function() {
+                    const callId = this.dataset.callId;
+                    showCallDetails(callId);
+                });
+            });
+
+            // Call response handling
+            document.querySelectorAll('.call-response').forEach(button => {
+                button.addEventListener('click', function() {
+                    const callSid = this.dataset.callSid;
+                    const response = this.dataset.response;
+                    handleCallResponse(callSid, response);
+                });
+            });
+
+            // Filter functionality
+            document.getElementById('apply-filters').addEventListener('click', applyFilters);
+            document.getElementById('clear-filters').addEventListener('click', clearFilters);
+            document.getElementById('export-logs').addEventListener('click', exportLogs);
+            document.getElementById('refresh-table').addEventListener('click', refreshTable);
+        });
+
+        function showCallDetails(callId) {
+            // This would normally fetch call details via AJAX
+            // For now, show basic modal
+            const modal = new bootstrap.Modal(document.getElementById('callDetailsModal'));
+            document.getElementById('callDetailsContent').innerHTML = `
+                <p>Loading call details for ID: ${callId}...</p>
+                <div class="spinner-border" role="status">
+                    <span class="visually-hidden">Loading...</span>
+                </div>
+            `;
+            modal.show();
+        }
+
+        function handleCallResponse(callSid, response) {
+            fetch('/api/call-response', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    call_id: callSid,
+                    response: response
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    alert(`Call marked as ${data.response}`);
+                    location.reload();
+                } else {
+                    alert('Error: ' + data.error);
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Error processing request');
+            });
+        }
+
+        function applyFilters() {
+            // Apply filters to the table
+            console.log('Applying filters...');
+        }
+
+        function clearFilters() {
+            document.getElementById('status-filter').value = '';
+            document.getElementById('phone-filter').value = '';
+            document.getElementById('date-from').value = '';
+            document.getElementById('date-to').value = '';
+        }
+
+        function exportLogs() {
+            // Export logs to CSV
+            console.log('Exporting logs...');
+        }
+
+        function refreshTable() {
+            location.reload();
+        }
+    </script>
+</body>
+</html>

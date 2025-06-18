@@ -1,0 +1,234 @@
+/* Custom styles for the Call Automation Dashboard */
+
+:root {
+    --status-connected: #0dcaf0;
+    --status-accepted: #198754;
+    --status-forwarded: #ffc107;
+    --status-failed: #dc3545;
+    --status-not-called: #6c757d;
+    --status-calling: #fd7e14;
+}
+
+/* Status badges */
+.call-status-connected {
+    background-color: var(--status-connected) !important;
+}
+
+.call-status-accepted {
+    background-color: var(--status-accepted) !important;
+}
+
+.call-status-forwarded {
+    background-color: var(--status-forwarded) !important;
+    color: #000 !important;
+}
+
+.call-status-failed {
+    background-color: var(--status-failed) !important;
+}
+
+.call-status-not-called,
+.call-status-not_called {
+    background-color: var(--status-not-called) !important;
+}
+
+.call-status-calling {
+    background-color: var(--status-calling) !important;
+}
+
+.call-status-disconnected {
+    background-color: var(--status-failed) !important;
+}
+
+/* Card styling improvements */
+.card {
+    border: none;
+    box-shadow: 0 0.125rem 0.25rem rgba(255, 255, 255, 0.075);
+    margin-bottom: 1.5rem;
+}
+
+.card-header {
+    background-color: var(--bs-gray-800);
+    border-bottom: 1px solid var(--bs-border-color);
+}
+
+/* Status cards */
+.status-cards .card {
+    transition: transform 0.2s ease-in-out;
+}
+
+.status-cards .card:hover {
+    transform: translateY(-2px);
+}
+
+/* Table improvements */
+.table {
+    margin-bottom: 0;
+}
+
+.table th {
+    border-top: none;
+    font-weight: 600;
+    text-transform: uppercase;
+    font-size: 0.875rem;
+    letter-spacing: 0.5px;
+}
+
+.table-responsive {
+    border-radius: 0.375rem;
+}
+
+/* Button group improvements */
+.btn-group-sm .btn {
+    padding: 0.25rem 0.5rem;
+}
+
+/* Loading states */
+.loading {
+    opacity: 0.6;
+    pointer-events: none;
+}
+
+.spinner-border-sm {
+    width: 1rem;
+    height: 1rem;
+}
+
+/* Real-time indicators */
+.status-indicator {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    margin-right: 0.5rem;
+}
+
+.status-indicator.running {
+    background-color: var(--bs-success);
+    animation: pulse 2s infinite;
+}
+
+.status-indicator.stopped {
+    background-color: var(--bs-secondary);
+}
+
+@keyframes pulse {
+    0% {
+        transform: scale(0.95);
+        box-shadow: 0 0 0 0 rgba(25, 135, 84, 0.7);
+    }
+    
+    70% {
+        transform: scale(1);
+        box-shadow: 0 0 0 10px rgba(25, 135, 84, 0);
+    }
+    
+    100% {
+        transform: scale(0.95);
+        box-shadow: 0 0 0 0 rgba(25, 135, 84, 0);
+    }
+}
+
+/* Form improvements */
+.form-control:focus,
+.form-select:focus {
+    border-color: var(--bs-primary);
+    box-shadow: 0 0 0 0.2rem rgba(13, 110, 253, 0.25);
+}
+
+/* Navbar improvements */
+.navbar-brand {
+    font-weight: 600;
+}
+
+/* Alert improvements */
+.alert {
+    border: none;
+    border-radius: 0.5rem;
+}
+
+/* Modal improvements */
+.modal-content {
+    background-color: var(--bs-dark);
+    border: 1px solid var(--bs-border-color);
+}
+
+.modal-header {
+    border-bottom: 1px solid var(--bs-border-color);
+}
+
+.modal-footer {
+    border-top: 1px solid var(--bs-border-color);
+}
+
+/* Responsive improvements */
+@media (max-width: 768px) {
+    .status-cards .col-md-2 {
+        margin-bottom: 1rem;
+    }
+    
+    .btn-group .btn {
+        font-size: 0.75rem;
+        padding: 0.25rem 0.4rem;
+    }
+    
+    .table-responsive {
+        font-size: 0.875rem;
+    }
+}
+
+/* Custom scrollbar for table */
+.table-responsive::-webkit-scrollbar {
+    height: 8px;
+}
+
+.table-responsive::-webkit-scrollbar-track {
+    background: var(--bs-gray-800);
+    border-radius: 4px;
+}
+
+.table-responsive::-webkit-scrollbar-thumb {
+    background: var(--bs-gray-600);
+    border-radius: 4px;
+}
+
+.table-responsive::-webkit-scrollbar-thumb:hover {
+    background: var(--bs-gray-500);
+}
+
+/* Animation for status updates */
+.status-update {
+    animation: highlight 1s ease-in-out;
+}
+
+@keyframes highlight {
+    0% {
+        background-color: var(--bs-warning);
+        color: #000;
+    }
+    100% {
+        background-color: transparent;
+        color: inherit;
+    }
+}
+
+/* Tooltip improvements */
+.tooltip {
+    font-size: 0.875rem;
+}
+
+/* Badge improvements */
+.badge {
+    font-weight: 500;
+    letter-spacing: 0.3px;
+}
+
+/* Progress indicators */
+.progress {
+    height: 0.5rem;
+    background-color: var(--bs-gray-800);
+}
+
+.progress-bar {
+    background-color: var(--bs-primary);
+}
