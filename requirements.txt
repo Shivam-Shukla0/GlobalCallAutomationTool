@@ -1,4 +1,12 @@
-Flask
-twilio
-python-dotenv
-pandas
+Flask==2.3.3
+Flask-SQLAlchemy==3.0.5
+Flask-Limiter==3.5.0
+SQLAlchemy==2.0.21
+Werkzeug==2.3.7
+twilio==8.10.0
+gspread==5.10.0
+google-auth-oauthlib==1.1.0
+google-auth==2.24.0
+python-dotenv==1.0.0
+gunicorn==21.2.0
+redis==5.0.0

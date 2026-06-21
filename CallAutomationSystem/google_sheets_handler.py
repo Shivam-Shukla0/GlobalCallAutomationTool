@@ -54,7 +54,7 @@ class GoogleSheetsHandler:
             else:
                 worksheet = sheet.get_worksheet(0)  # First worksheet
             
-            # Get all records
+            # Get all records using efficient API call
             records = worksheet.get_all_records()
             
             # Validate and format data
@@ -78,10 +78,8 @@ class GoogleSheetsHandler:
             logging.error(f"Error reading from Google Sheets: {str(e)}")
             raise
     
-    def update_call_status(self, sheet_url: str, phone_number: str, status: str, 
-                          response: str = None, timestamp: str = None, 
-                          worksheet_name: str = None):
-        """Update call status in Google Sheets"""
+    def update_call_status_batch(self, sheet_url: str, updates: List[Dict], worksheet_name: str = None):
+        """Batch update call statuses in Google Sheets for better performance"""
         if not self.client:
             logging.warning("Google Sheets client not initialized, skipping update")
             return
@@ -96,7 +94,7 @@ class GoogleSheetsHandler:
             else:
                 worksheet = sheet.get_worksheet(0)
             
-            # Find the row with the phone number
+            # Get all values once instead of per-row
             all_values = worksheet.get_all_values()
             headers = all_values[0] if all_values else []
             
@@ -116,23 +114,71 @@ class GoogleSheetsHandler:
                 elif header.lower() in ['timestamp', 'last_updated']:
                     timestamp_col = i + 1
             
-            # Find the row to update
-            for row_idx, row in enumerate(all_values[1:], start=2):
-                if len(row) > phone_col - 1 and row[phone_col - 1] == phone_number:
-                    # Update status
-                    if status_col:
-                        worksheet.update_cell(row_idx, status_col, status)
-                    
-                    # Update response if provided
-                    if response and response_col:
-                        worksheet.update_cell(row_idx, response_col, response)
-                    
-                    # Update timestamp if provided
-                    if timestamp and timestamp_col:
-                        worksheet.update_cell(row_idx, timestamp_col, timestamp)
-                    
-                    logging.info(f"Updated status for {phone_number} to {status}")
-                    break
+            # Build batch update cells list
+            cells_to_update = []
+            
+            for update_item in updates:
+                phone_number = update_item.get('phone_number')
+                status = update_item.get('status')
+                response = update_item.get('response')
+                timestamp = update_item.get('timestamp')
+                
+                # Find the row to update
+                for row_idx, row in enumerate(all_values[1:], start=2):
+                    if len(row) > (phone_col - 1) if phone_col else False:
+                        if row[phone_col - 1] == phone_number:
+                            # Add cells to batch update
+                            if status and status_col:
+                                cells_to_update.append({
+                                    'row': row_idx,
+                                    'col': status_col,
+                                    'value': status
+                                })
+                            
+                            if response and response_col:
+                                cells_to_update.append({
+                                    'row': row_idx,
+                                    'col': response_col,
+                                    'value': response
+                                })
+                            
+                            if timestamp and timestamp_col:
+                                cells_to_update.append({
+                                    'row': row_idx,
+                                    'col': timestamp_col,
+                                    'value': timestamp
+                                })
+                            break
+            
+            # Perform batch update in single API call
+            if cells_to_update:
+                worksheet.batch_update(
+                    [{'range': f'R{cell["row"]}C{cell["col"]}', 'values': [[cell["value"]]]} 
+                     for cell in cells_to_update],
+                    value_input_option='USER_ENTERED'
+                )
+                logging.info(f"Batch updated {len(updates)} call statuses")
+            
+        except Exception as e:
+            logging.error(f"Error batch updating Google Sheets: {str(e)}")
+    
+    def update_call_status(self, sheet_url: str, phone_number: str, status: str, 
+                          response: str = None, timestamp: str = None, 
+                          worksheet_name: str = None):
+        """Update single call status in Google Sheets"""
+        if not self.client:
+            logging.warning("Google Sheets client not initialized, skipping update")
+            return
+        
+        try:
+            # Use batch update for consistency
+            update_item = {
+                'phone_number': phone_number,
+                'status': status,
+                'response': response,
+                'timestamp': timestamp
+            }
+            self.update_call_status_batch(sheet_url, [update_item], worksheet_name)
             
         except Exception as e:
             logging.error(f"Error updating Google Sheets: {str(e)}")

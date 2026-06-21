@@ -1,20 +1,26 @@
 from app import db
 from datetime import datetime
+from sqlalchemy import Index
 
 class CallLog(db.Model):
     """Model for storing call logs"""
     id = db.Column(db.Integer, primary_key=True)
-    phone_number = db.Column(db.String(20), nullable=False)
+    phone_number = db.Column(db.String(20), nullable=False, index=True)
     caller_name = db.Column(db.String(100))
-    call_status = db.Column(db.String(20), nullable=False)  # Not Called, Connected, Disconnected, Forwarded, Accepted
-    call_sid = db.Column(db.String(100))  # Twilio Call SID
+    call_status = db.Column(db.String(20), nullable=False)
+    call_sid = db.Column(db.String(100), index=True, unique=True)
     start_time = db.Column(db.DateTime, default=datetime.utcnow)
     end_time = db.Column(db.DateTime)
-    duration = db.Column(db.Integer)  # Duration in seconds
-    response = db.Column(db.String(20))  # Accept, Forward, Reject
+    duration = db.Column(db.Integer)
+    response = db.Column(db.String(20))
     notes = db.Column(db.Text)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, index=True)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    __table_args__ = (
+        Index('idx_call_log_phone_created', 'phone_number', 'created_at'),
+        Index('idx_call_log_status', 'call_status'),
+    )
 
     def __repr__(self):
         return f'<CallLog {self.phone_number}: {self.call_status}>'
@@ -39,16 +45,21 @@ class CallLog(db.Model):
 class CallQueue(db.Model):
     """Model for storing call queue"""
     id = db.Column(db.Integer, primary_key=True)
-    phone_number = db.Column(db.String(20), nullable=False)
+    phone_number = db.Column(db.String(20), nullable=False, index=True)
     caller_name = db.Column(db.String(100))
     priority = db.Column(db.Integer, default=1)
-    status = db.Column(db.String(20), default='Not Called')
+    status = db.Column(db.String(20), default='Not Called', index=True)
     assigned_script = db.Column(db.String(50), default='default')
     scheduled_time = db.Column(db.DateTime)
     attempts = db.Column(db.Integer, default=0)
     max_attempts = db.Column(db.Integer, default=3)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    __table_args__ = (
+        Index('idx_queue_status_priority_created', 'status', 'priority', 'created_at'),
+        Index('idx_queue_phone_status', 'phone_number', 'status'),
+    )
 
     def __repr__(self):
         return f'<CallQueue {self.phone_number}: {self.status}>'

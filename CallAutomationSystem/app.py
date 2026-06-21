@@ -2,6 +2,8 @@ import os
 import logging
 from flask import Flask, render_template, request, jsonify, redirect, url_for, flash
 from flask_sqlalchemy import SQLAlchemy
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 from sqlalchemy.orm import DeclarativeBase
 from werkzeug.middleware.proxy_fix import ProxyFix
 from datetime import datetime
@@ -24,15 +26,26 @@ app = Flask(__name__)
 app.secret_key = os.environ.get("SESSION_SECRET", "fallback-secret-key-for-development")
 app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
 
-# Configure the database
+# Configure the database with optimized connection pooling
 app.config["SQLALCHEMY_DATABASE_URI"] = os.environ.get("DATABASE_URL", "sqlite:///call_automation.db")
 app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
+    "pool_size": int(os.environ.get("DB_POOL_SIZE", 10)),
+    "max_overflow": int(os.environ.get("DB_MAX_OVERFLOW", 20)),
     "pool_recycle": 300,
     "pool_pre_ping": True,
+    "echo": False,
 }
 
 # Initialize extensions
 db.init_app(app)
+
+# Initialize rate limiter
+limiter = Limiter(
+    app=app,
+    key_func=get_remote_address,
+    default_limits=["200 per day", "50 per hour"],
+    storage_uri=os.environ.get("REDIS_URL") if os.environ.get("REDIS_URL") else None
+)
 
 # Global automation system instance
 automation_system = None
@@ -43,6 +56,7 @@ with app.app_context():
     db.create_all()
 
 @app.route('/')
+@limiter.limit("30 per minute")
 def dashboard():
     """Main dashboard route"""
     global automation_system
@@ -58,6 +72,7 @@ def dashboard():
                          recent_calls=recent_calls)
 
 @app.route('/api/queue-status')
+@limiter.limit("60 per minute")
 def api_queue_status():
     """API endpoint for real-time queue status"""
     global automation_system
@@ -67,6 +82,7 @@ def api_queue_status():
     return jsonify(automation_system.get_queue_statistics())
 
 @app.route('/api/recent-calls')
+@limiter.limit("60 per minute")
 def api_recent_calls():
     """API endpoint for recent call logs"""
     global automation_system
@@ -78,6 +94,7 @@ def api_recent_calls():
     return jsonify(calls)
 
 @app.route('/start-automation', methods=['POST'])
+@limiter.limit("5 per minute")
 def start_automation():
     """Start the call automation process"""
     global automation_system
@@ -117,6 +134,7 @@ def start_automation():
     return redirect(url_for('dashboard'))
 
 @app.route('/stop-automation', methods=['POST'])
+@limiter.limit("5 per minute")
 def stop_automation():
     """Stop the call automation process"""
     global automation_system
@@ -127,6 +145,7 @@ def stop_automation():
     return redirect(url_for('dashboard'))
 
 @app.route('/upload-queue', methods=['POST'])
+@limiter.limit("10 per minute")
 def upload_queue():
     """Upload a new call queue CSV file"""
     global automation_system
@@ -161,6 +180,7 @@ def upload_queue():
     return redirect(url_for('dashboard'))
 
 @app.route('/call-logs')
+@limiter.limit("30 per minute")
 def call_logs():
     """View detailed call logs"""
     global automation_system
@@ -176,6 +196,7 @@ def call_logs():
     return render_template('call_logs.html', calls=calls, page=page)
 
 @app.route('/api/call-response', methods=['POST'])
+@limiter.limit("100 per minute")
 def api_call_response():
     """Handle call response (Accept/Forward)"""
     global automation_system
@@ -198,6 +219,7 @@ def api_call_response():
         return jsonify({"error": str(e)}), 500
 
 @app.route('/api/update-script', methods=['POST'])
+@limiter.limit("20 per minute")
 def api_update_script():
     """Update call script"""
     try:
@@ -225,5 +247,10 @@ def api_update_script():
         logging.error(f"Error updating script: {str(e)}")
         return jsonify({"error": str(e)}), 500
 
+@app.errorhandler(429)
+def ratelimit_handler(e):
+    """Handle rate limit exceeded"""
+    return jsonify({"error": "Rate limit exceeded. Please try again later."}), 429
+
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    app.run(host='0.0.0.0', port=5000, debug=False)
