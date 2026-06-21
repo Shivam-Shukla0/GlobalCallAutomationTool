@@ -8,6 +8,7 @@ from datetime import datetime, timedelta
 from typing import Dict, List, Optional
 from twilio.rest import Client
 from twilio.base.exceptions import TwilioException
+from sqlalchemy import func
 
 class CallAutomationSystem:
     """Main class for handling call automation"""
@@ -19,6 +20,9 @@ class CallAutomationSystem:
         self.call_queue = []
         self.call_scripts = {}
         self.automation_thread = None
+        self.stats_cache = None
+        self.stats_cache_time = None
+        self.cache_ttl = 5  # Cache statistics for 5 seconds
         
         # Initialize Twilio client
         self._init_twilio_client()
@@ -87,11 +91,13 @@ class CallAutomationSystem:
             with app.app_context():
                 with open(csv_file, 'r') as f:
                     reader = csv.DictReader(f)
+                    rows = list(reader)
                     
                     # Clear existing queue
                     CallQueue.query.delete()
                     
-                    for row in reader:
+                    # Batch insert for better performance
+                    for row in rows:
                         queue_item = CallQueue(
                             phone_number=row.get('phone_number', ''),
                             caller_name=row.get('caller_name', ''),
@@ -101,7 +107,7 @@ class CallAutomationSystem:
                         db.session.add(queue_item)
                     
                     db.session.commit()
-                    logging.info(f"Loaded {CallQueue.query.count()} calls from CSV")
+                    logging.info(f"Loaded {len(rows)} calls from CSV")
                 
         except Exception as e:
             logging.error(f"Error loading queue from CSV: {str(e)}")
@@ -120,6 +126,7 @@ class CallAutomationSystem:
             # Clear existing queue
             CallQueue.query.delete()
             
+            # Batch insert for better performance
             for row in data:
                 queue_item = CallQueue(
                     phone_number=row.get('phone_number', ''),
@@ -131,6 +138,7 @@ class CallAutomationSystem:
             
             db.session.commit()
             logging.info(f"Loaded {len(data)} calls from Google Sheets")
+            self.stats_cache = None  # Invalidate cache
             
         except Exception as e:
             logging.error(f"Error loading queue from Google Sheets: {str(e)}")
@@ -205,14 +213,20 @@ class CallAutomationSystem:
             from models import CallQueue, CallLog
             
             with app.app_context():
+                empty_queue_delay = 1  # Start with 1 second delay for empty queue
                 while self.is_automation_running:
                     # Get next call from queue
                     next_call = CallQueue.query.filter_by(status='Not Called').order_by(CallQueue.priority.desc(), CallQueue.created_at.asc()).first()
                     
                     if not next_call:
-                        logging.info("No more calls in queue")
-                        self.is_automation_running = False
-                        break
+                        logging.info("No more calls in queue, waiting before retry")
+                        # Exponential backoff for empty queue (1s, 2s, 4s, 8s, max 30s)
+                        time.sleep(min(empty_queue_delay, 30))
+                        empty_queue_delay = min(empty_queue_delay * 2, 30)
+                        continue
+                    
+                    # Reset delay when call is found
+                    empty_queue_delay = 1
                     
                     # Update status to calling
                     next_call.status = 'Calling'
@@ -254,6 +268,7 @@ class CallAutomationSystem:
                             next_call.status = 'Failed'
                     
                     db.session.commit()
+                    self.stats_cache = None  # Invalidate cache on status change
                     
                     # Wait between calls
                     time.sleep(5)
@@ -262,6 +277,7 @@ class CallAutomationSystem:
             logging.error(f"Error in automation loop: {str(e)}")
         finally:
             self.is_automation_running = False
+            self.stats_cache = None
             logging.info("Call automation stopped")
     
     def stop_automation(self):
@@ -312,6 +328,7 @@ class CallAutomationSystem:
                 call_log.duration = int(duration)
             
             db.session.commit()
+            self.stats_cache = None  # Invalidate cache
             
             return {"success": True, "response": call_log.response}
             
@@ -320,26 +337,42 @@ class CallAutomationSystem:
             return {"error": str(e)}
     
     def get_queue_statistics(self) -> Dict:
-        """Get current queue statistics"""
+        """Get current queue statistics with caching"""
         try:
             from models import CallQueue
             
-            total_calls = CallQueue.query.count()
-            not_called = CallQueue.query.filter_by(status='Not Called').count()
-            connected = CallQueue.query.filter_by(status='Connected').count()
-            accepted = CallQueue.query.filter_by(status='Accepted').count()
-            forwarded = CallQueue.query.filter_by(status='Forwarded').count()
-            failed = CallQueue.query.filter_by(status='Failed').count()
+            # Return cached stats if available and fresh
+            if self.stats_cache and self.stats_cache_time:
+                if (datetime.utcnow() - self.stats_cache_time).total_seconds() < self.cache_ttl:
+                    return self.stats_cache
             
-            return {
+            # Use single aggregated query instead of multiple queries
+            status_counts = db.session.query(
+                CallQueue.status,
+                func.count(CallQueue.id).label('count')
+            ).group_by(CallQueue.status).all()
+            
+            # Convert to dictionary
+            stats_dict = {status: count for status, count in status_counts}
+            
+            total_calls = CallQueue.query.count()
+            
+            stats_result = {
                 'total_calls': total_calls,
-                'not_called': not_called,
-                'connected': connected,
-                'accepted': accepted,
-                'forwarded': forwarded,
-                'failed': failed,
+                'not_called': stats_dict.get('Not Called', 0),
+                'connected': stats_dict.get('Connected', 0),
+                'accepted': stats_dict.get('Accepted', 0),
+                'forwarded': stats_dict.get('Forwarded', 0),
+                'failed': stats_dict.get('Failed', 0),
+                'retry_scheduled': stats_dict.get('Retry Scheduled', 0),
                 'is_running': self.is_automation_running
             }
+            
+            # Cache the results
+            self.stats_cache = stats_result
+            self.stats_cache_time = datetime.utcnow()
+            
+            return stats_result
             
         except Exception as e:
             logging.error(f"Error getting queue statistics: {str(e)}")
@@ -350,6 +383,7 @@ class CallAutomationSystem:
                 'accepted': 0,
                 'forwarded': 0,
                 'failed': 0,
+                'retry_scheduled': 0,
                 'is_running': False
             }
     
