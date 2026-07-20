@@ -24,6 +24,12 @@ class BaseConfig:
     SQLALCHEMY_DATABASE_URI = os.environ.get(
         "DATABASE_URL", "sqlite:///instance/call_automation.db"
     )
+    # Render/Heroku hand out legacy "postgres://" URLs; SQLAlchemy 2.0 only
+    # accepts "postgresql://". Normalize so deploys work out of the box.
+    if SQLALCHEMY_DATABASE_URI.startswith("postgres://"):
+        SQLALCHEMY_DATABASE_URI = SQLALCHEMY_DATABASE_URI.replace(
+            "postgres://", "postgresql://", 1
+        )
     # Connection-pool tuning only applies to real servers (Postgres), not SQLite.
     if SQLALCHEMY_DATABASE_URI.startswith("postgresql"):
         SQLALCHEMY_ENGINE_OPTIONS = {
@@ -54,6 +60,7 @@ class BaseConfig:
     CALLING_WINDOW_START = os.environ.get("CALLING_WINDOW_START", "09:00")
     CALLING_WINDOW_END = os.environ.get("CALLING_WINDOW_END", "20:00")
     CALLING_TIMEZONE = os.environ.get("CALLING_TIMEZONE", "Asia/Kolkata")
+    CALLING_REGION = os.environ.get("CALLING_REGION", "IN")
 
     # --- Uploads ---
     MAX_CONTENT_LENGTH = 5 * 1024 * 1024  # 5 MB cap on uploads
