@@ -1,0 +1,33 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: cas
+      POSTGRES_PASSWORD: cas
+      POSTGRES_DB: call_automation
+    volumes: ["pgdata:/var/lib/postgresql/data"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U cas"]
+      interval: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+
+  web:
+    build: .
+    env_file: .env
+    depends_on: { db: { condition: service_healthy }, redis: { condition: service_started } }
+    ports: ["8000:8000"]
+    command: >
+      sh -c "flask db upgrade && flask create-admin || true &&
+             gunicorn wsgi:app --bind 0.0.0.0:8000 --workers 3 --timeout 120"
+
+  worker:
+    build: .
+    env_file: .env
+    depends_on: [db, redis]
+    command: celery -A worker.celery worker --beat --loglevel=info
+
+volumes:
+  pgdata:
