@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Dashboard</h1>
+<section class="stats-grid">
+  {% for label, key in [("Total","total"),("Queued","queued"),("In progress","in_progress"),
+                        ("Completed","completed"),("Failed","failed"),("Retry","retry"),
+                        ("Skipped","skipped")] %}
+  <div class="card stat"><span class="stat-num" id="stat-{{ key }}">{{ stats[key] }}</span>
+    <span class="stat-label">{{ label }}</span></div>
+  {% endfor %}
+</section>
+
+<div class="actions">
+  <form method="post" action="{{ url_for('dashboard.upload_queue') }}"
+        enctype="multipart/form-data" class="card">
+    {{ upload_form.hidden_tag() }}
+    {{ upload_form.queue_file() }}
+    {{ upload_form.submit(class="btn") }}
+  </form>
+  <form method="post" action="{{ url_for('dashboard.start_automation') }}" class="card">
+    {{ upload_form.hidden_tag() }}
+    <button class="btn btn-primary" type="submit">Start dialing</button>
+  </form>
+</div>
+
+<h2>Recent calls</h2>
+<table class="table">
+  <thead><tr><th>Number</th><th>Name</th><th>Status</th><th>Response</th></tr></thead>
+  <tbody id="recent-calls">
+    {% for c in recent_calls %}
+    <tr><td>{{ c.phone_number }}</td><td>{{ c.caller_name }}</td>
+        <td>{{ c.call_status }}</td><td>{{ c.response or '-' }}</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endblock %}
